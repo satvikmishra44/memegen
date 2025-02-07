@@ -1,54 +1,187 @@
-import React, { useEffect, useState } from 'react';
-import MemeCanvas from './MemeCanvas';
+import React, { useState, useEffect } from "react";
+import html2canvas from "html2canvas";
+import { Dialog, DialogTitle, DialogContent, TextField, Button } from "@mui/material";
+import Draggable from 'react-draggable'; // Import react-draggable
 
-function MemeEditor() {
-    const [top, setTop] = useState("");
-    const [bottom, setBottom] = useState("");
-    const [image, setImage] = useState(null);
-    const [memes, setMemes] = useState([]);
-    const [searchq, setSearchq] = useState("");
+const MemeEditor = () => {
+  const [memes, setMemes] = useState([]);
+  const [selectedMeme, setSelectedMeme] = useState(null);
+  const [topText, setTopText] = useState("");
+  const [bottomText, setBottomText] = useState("");
+  const [open, setOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState(""); // Added state for search term
 
-    const fetchMemes = (query) => {
-        fetch("https://api.imgflip.com/get_memes")
-        .then((res) => res.json())
-        .then((data) => {
-            const filteredmemes = data.data.memes.filter((meme) => meme.name.toLowerCase().includes(query.toLowerCase()));
-            setMemes(filteredmemes);
-            setImage(filteredmemes[0]?.url);
-        }).catch((err) => console.error(err));
+  useEffect(() => {
+    fetch("https://api.imgflip.com/get_memes")
+      .then((res) => res.json())
+      .then((data) => setMemes(data.data.memes));
+  }, []);
+
+  const openModal = (meme) => {
+    setSelectedMeme(meme);
+    setOpen(true);
+  };
+
+  const closeModal = () => {
+    setOpen(false);
+    setTopText("");
+    setBottomText("");
+  };
+
+  const downloadMeme = () => {
+    const memeElement = document.getElementById("meme-canvas");
+    const memeImage = memeElement.querySelector("img"); // Grab the meme image
+
+    // Ensure the meme image is loaded before proceeding
+    memeImage.onload = () => {
+      html2canvas(memeElement, {
+        useCORS: true, // Ensure external images are captured
+        backgroundColor: null, // Remove any unwanted background
+        logging: true, // Helps debug if necessary
+      }).then((canvas) => {
+        const link = document.createElement("a");
+        link.href = canvas.toDataURL("image/png");
+        link.download = "meme.png";
+        link.click();
+      });
+    };
+
+    // Trigger the image loading process if already loaded
+    if (memeImage.complete) {
+      memeImage.onload();
     }
+  };
 
-    useEffect(() => {
-        fetchMemes("");
-    }, []);
+  // Filter memes based on search term
+  const filteredMemes = memes.filter((meme) =>
+    meme.name.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
-    return (
-        <div className='bg-gray-800 p-6 rounded-lg shadow-lg max-w-lg w-full'>
-            <h1 className='text-2xl font-bold mb-4 text-white'>Meme Generator</h1>
-            
-            <input type="text" placeholder='Search Memes...' value={searchq} onChange={(e) => {
-                setSearchq(e.target.value);
-                fetchMemes(e.target.value);
-            }} className='w-full p-2 mb-3 rounded bg-gray-700 text-white' />
+  return (
+    <div style={{ textAlign: "center", padding: "20px" }}>
+      <h1>Meme Generator</h1>
 
-            <input type="text" placeholder='Top Text' value={top} onChange={(e) => setTop(e.target.value)} />
-            <input type="text" placeholder='Bottom Text' value={bottom} onChange={(e) => setBottom(e.target.value)} className='w-full p-2 mb-3 rounded bg-gray-700 text-white' />
+      {/* Search Bar */}
+      <TextField
+        fullWidth
+        margin="normal"
+        label="Search Memes"
+        variant="outlined"
+        value={searchTerm}
+        onChange={(e) => setSearchTerm(e.target.value)}
+        style={{ marginBottom: "20px", width: "300px", margin: "0 auto" }}
+      />
 
-            {/* Meme Thumbnails */}
-            {memes.length > 0 ? (
-                <div className='flex flex-wrap'>
-                    {memes.map((meme) => (
-                        <img key={meme.id} src={meme.url} alt={meme.name} className='w-full rounded-md cursor-pointer' onClick={() => setImage(meme.url)} />
-                    ))}
-                </div>
-            ) : (
-                <p className='text-white'>No Memes Found</p>
-            )}
+      {/* Meme Grid */}
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))",
+          gap: "10px",
+        }}
+      >
+        {filteredMemes.map((meme) => (
+          <img
+            key={meme.id}
+            src={meme.url}
+            alt={meme.name}
+            style={{ width: "100%", cursor: "pointer" }}
+            onClick={() => openModal(meme)}
+          />
+        ))}
+      </div>
 
-            {/* Meme Canvas */}
-            {image && <MemeCanvas image={image} top={top} bottom={bottom} />}
-        </div>
-    );
-}
+      {/* Modal for Meme Editing */}
+      <Dialog open={open} onClose={closeModal} fullWidth maxWidth="sm">
+        <DialogTitle>Edit Your Meme</DialogTitle>
+        <DialogContent style={{ textAlign: "center" }}>
+          {selectedMeme && (
+            <div
+              id="meme-canvas"
+              style={{
+                position: "relative",
+                display: "inline-block",
+                width: "100%",
+                height: "auto",
+                minHeight: "300px", // Set a minimum height to ensure it looks good
+              }}
+            >
+              {/* Meme Image */}
+              <img
+                src={selectedMeme.url}
+                alt="Meme"
+                style={{
+                  width: "100%",
+                  height: "auto",
+                  display: "block",
+                  objectFit: "cover",
+                }}
+              />
+              {/* Draggable Top Text */}
+              <Draggable>
+                <p
+                  style={{
+                    position: "absolute",
+                    top: "10px",
+                    left: "50%",
+                    transform: "translateX(-50%)",
+                    fontSize: "24px",
+                    fontWeight: "bold",
+                    color: "white",
+                    textShadow: "2px 2px 4px black",
+                  }}
+                >
+                  {topText}
+                </p>
+              </Draggable>
+              {/* Draggable Bottom Text */}
+              <Draggable>
+                <p
+                  style={{
+                    position: "absolute",
+                    bottom: "10px",
+                    left: "50%",
+                    transform: "translateX(-50%)",
+                    fontSize: "24px",
+                    fontWeight: "bold",
+                    color: "white",
+                    textShadow: "2px 2px 4px black",
+                  }}
+                >
+                  {bottomText}
+                </p>
+              </Draggable>
+            </div>
+          )}
+
+          <TextField
+            fullWidth
+            margin="normal"
+            label="Top Text"
+            variant="outlined"
+            value={topText}
+            onChange={(e) => setTopText(e.target.value)}
+          />
+          <TextField
+            fullWidth
+            margin="normal"
+            label="Bottom Text"
+            variant="outlined"
+            value={bottomText}
+            onChange={(e) => setBottomText(e.target.value)}
+          />
+          <Button
+            variant="contained"
+            color="primary"
+            onClick={downloadMeme}
+            style={{ marginTop: "10px" }}
+          >
+            Download Meme
+          </Button>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+};
 
 export default MemeEditor;
