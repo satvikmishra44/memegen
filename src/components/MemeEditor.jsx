@@ -1,187 +1,162 @@
-import React, { useState, useEffect } from "react";
-import html2canvas from "html2canvas";
-import { Dialog, DialogTitle, DialogContent, TextField, Button } from "@mui/material";
-import Draggable from 'react-draggable'; // Import react-draggable
+import { Dialog, DialogContent, DialogTitle, TextField, Button } from '@mui/material';
+import html2canvas from 'html2canvas';
+import React, { useEffect, useState } from 'react';
+import Draggable from 'react-draggable';
 
-const MemeEditor = () => {
+function MemeEditor() {
+
   const [memes, setMemes] = useState([]);
-  const [selectedMeme, setSelectedMeme] = useState(null);
-  const [topText, setTopText] = useState("");
-  const [bottomText, setBottomText] = useState("");
+  const [selected, setSelected] = useState(null);
+  const [top, setTop] = useState("");
+  const [bottom, setBottom] = useState("");
   const [open, setOpen] = useState(false);
-  const [searchTerm, setSearchTerm] = useState(""); // Added state for search term
+  const [searched, setSearched] = useState("");
+  const [addedText, setAddedText] = useState([]);
+  const [newText, setNewText] = useState("");
+  const [clickedIndex, setClickedIndex] = useState(null);
 
   useEffect(() => {
     fetch("https://api.imgflip.com/get_memes")
-      .then((res) => res.json())
-      .then((data) => setMemes(data.data.memes));
-  }, []);
+    .then((res) => res.json())
+    .then((data) => setMemes(data.data.memes));
+  }, [])
 
   const openModal = (meme) => {
-    setSelectedMeme(meme);
+    setSelected(meme);
     setOpen(true);
-  };
+  }
 
-  const closeModal = () => {
+  const handleClose = () => {
     setOpen(false);
-    setTopText("");
-    setBottomText("");
-  };
+    setTop("");
+    setBottom("");
+    setAddedText([]);
+  }
+
 
   const downloadMeme = () => {
-    const memeElement = document.getElementById("meme-canvas");
-    const memeImage = memeElement.querySelector("img"); // Grab the meme image
+    const memeElement = document.getElementById("meme");
+    const memeImage = memeElement.querySelector("img");
 
-    // Ensure the meme image is loaded before proceeding
     memeImage.onload = () => {
       html2canvas(memeElement, {
-        useCORS: true, // Ensure external images are captured
-        backgroundColor: null, // Remove any unwanted background
-        logging: true, // Helps debug if necessary
+        useCORS: true,
+        backgroundColor: null,
+        logging: true
       }).then((canvas) => {
         const link = document.createElement("a");
         link.href = canvas.toDataURL("image/png");
         link.download = "meme.png";
         link.click();
-      });
+      })
     };
 
-    // Trigger the image loading process if already loaded
-    if (memeImage.complete) {
+    if(memeImage.complete){
       memeImage.onload();
     }
-  };
+  }
+  
+  const addNewText = () => {
+    setAddedText([...addedText, newText]);
+    setNewText("");
+  }
 
-  // Filter memes based on search term
-  const filteredMemes = memes.filter((meme) =>
-    meme.name.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const removeText = (index) => {
+    setAddedText(addedText.filter((_, i) => i != index));
+  }
+
+  const filteredMemes = memes.filter((meme) => {
+    return meme.name.toLowerCase().includes(searched.toLowerCase())
+  })
+
+  const handleTextClick = (index) => {
+    setClickedIndex(clickedIndex === index ? null : index);
+  }
 
   return (
-    <div style={{ textAlign: "center", padding: "20px" }}>
-      <h1>Meme Generator</h1>
+    <div style={{textAlign:"center", width:"100vw"}}>
+
+      <div style={{height:"20%", width:"100%", top:"0", display:"flex", textAlign:"center", alignItems:"center", flexDirection:"column", position:"absolute"}}>
+        <h1>MemeGen</h1>
 
       {/* Search Bar */}
-      <TextField
-        fullWidth
-        margin="normal"
-        label="Search Memes"
-        variant="outlined"
-        value={searchTerm}
-        onChange={(e) => setSearchTerm(e.target.value)}
-        style={{ marginBottom: "20px", width: "300px", margin: "0 auto" }}
-      />
-
-      {/* Meme Grid */}
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))",
-          gap: "10px",
-        }}
-      >
-        {filteredMemes.map((meme) => (
-          <img
-            key={meme.id}
-            src={meme.url}
-            alt={meme.name}
-            style={{ width: "100%", cursor: "pointer" }}
-            onClick={() => openModal(meme)}
-          />
-        ))}
+        <TextField fullWidth margin='normal' label="Search" value={searched} variant='outlined' onChange={e => setSearched(e.target.value)} style={{width:"50%", margin: "auto"}} />
       </div>
+     
+        {/* Meme Grid */}
 
-      {/* Modal for Meme Editing */}
-      <Dialog open={open} onClose={closeModal} fullWidth maxWidth="sm">
+    <div style={{
+      columnCount: 4,  // You can adjust this value to control the number of columns
+      columnGap: "10px", 
+      padding: "10px",
+      marginTop:"50%"
+    }}>
+      {filteredMemes.map((meme) => (
+        <img
+          key={meme.id}
+          src={meme.url}
+          alt={meme.name}
+          style={{
+            width: "100%",          // Ensures image is responsive and doesn't overflow
+            height: "auto",         // Maintains aspect ratio
+            objectFit: "cover",     // Ensures images fill their containers without stretching or distorting
+            borderRadius: "10px",   // Optional, adds rounded corners for a nice look
+            cursor: "pointer",
+            breakInside: "avoid",   // Prevents images from being split across columns
+          }}
+          onClick={() => openModal(meme)}
+        />
+      ))}
+    </div>
+
+
+      
+      {/* Modal For Meme Editing */}
+      <Dialog open={open} onClose={handleClose} fullWidth maxWidth="sm">
         <DialogTitle>Edit Your Meme</DialogTitle>
-        <DialogContent style={{ textAlign: "center" }}>
-          {selectedMeme && (
-            <div
-              id="meme-canvas"
-              style={{
-                position: "relative",
-                display: "inline-block",
-                width: "100%",
-                height: "auto",
-                minHeight: "300px", // Set a minimum height to ensure it looks good
-              }}
-            >
-              {/* Meme Image */}
-              <img
-                src={selectedMeme.url}
-                alt="Meme"
-                style={{
-                  width: "100%",
-                  height: "auto",
-                  display: "block",
-                  objectFit: "cover",
-                }}
-              />
-              {/* Draggable Top Text */}
-              <Draggable>
-                <p
-                  style={{
-                    position: "absolute",
-                    top: "10px",
-                    left: "50%",
-                    transform: "translateX(-50%)",
-                    fontSize: "24px",
-                    fontWeight: "bold",
-                    color: "white",
-                    textShadow: "2px 2px 4px black",
-                  }}
-                >
-                  {topText}
-                </p>
+        <DialogContent style={{textAlign:"center"}}>
+          {selected && (
+            <div id='meme' style={{position:"relative", display:"inline-block", width:"100%", height:"auto", minHeight:"300px"}}>
+
+            {/* Meme Image */}
+
+            <img src={selected.url} alt="Meme" style={{width:"100%", height:"auto", display:"block", objectFit:"cover"}} />
+            <Draggable>
+              <p style={{position:"absolute", top:"10px", left:"50%", transform:"translateX(-50%)", fontSize:"24px", color:"black", fontWeight:"bold"}}>
+                {top}
+              </p>
+            </Draggable>
+
+            {addedText.map((text, index) => (
+              <Draggable key={index}>
+                <div style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)", fontSize: "24px", fontWeight: "bold", color: "black"}} onClick={(e) => {e.stopPropagation(); handleTextClick(index); }}>
+                  <p>{text}</p>
+                  {clickedIndex === index && (
+                    <Button variant="contained" color="secondary" onClick={() => removeText(index)} style={{ marginTop: "5px" }}>Delete</Button>
+                  )}
+                </div>
               </Draggable>
-              {/* Draggable Bottom Text */}
-              <Draggable>
-                <p
-                  style={{
-                    position: "absolute",
-                    bottom: "10px",
-                    left: "50%",
-                    transform: "translateX(-50%)",
-                    fontSize: "24px",
-                    fontWeight: "bold",
-                    color: "white",
-                    textShadow: "2px 2px 4px black",
-                  }}
-                >
-                  {bottomText}
-                </p>
-              </Draggable>
+            ))}
+
+            <Draggable>
+              <p style={{position:"absolute", bottom:"10px", left:"50%", transform:"translateX(-50%)", fontSize:"24px", color:"black", fontWeight:"bold"}}>
+                {bottom}
+              </p>
+            </Draggable>  
             </div>
           )}
-
-          <TextField
-            fullWidth
-            margin="normal"
-            label="Top Text"
-            variant="outlined"
-            value={topText}
-            onChange={(e) => setTopText(e.target.value)}
-          />
-          <TextField
-            fullWidth
-            margin="normal"
-            label="Bottom Text"
-            variant="outlined"
-            value={bottomText}
-            onChange={(e) => setBottomText(e.target.value)}
-          />
-          <Button
-            variant="contained"
-            color="primary"
-            onClick={downloadMeme}
-            style={{ marginTop: "10px" }}
-          >
+        
+        <TextField fullWidth margin="normal" label="Top Text" variant="outlined" value={top} onChange={(e) => setTop(e.target.value)} />
+          <TextField fullWidth margin="normal" label="Bottom Text" variant="outlined" value={bottom} onChange={(e) => setBottom(e.target.value)} />
+          <TextField fullWidth margin="normal" label="New Text" variant="outlined" value={newText} onChange={(e) => setNewText(e.target.value)} />
+          <Button variant="contained" color="primary" onClick={downloadMeme} style={{ margin: "10px" }}>
             Download Meme
           </Button>
+          <Button variant="contained" color="secondary" onClick={addNewText} style={{ margin: "10px" }} >Add Text</Button>
         </DialogContent>
       </Dialog>
     </div>
   );
-};
+}
 
 export default MemeEditor;
